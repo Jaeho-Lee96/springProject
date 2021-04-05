@@ -1,0 +1,368 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper
+    PUBLIC "-//mybatis.org/DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="memoMapper">
+	<!-- SELECT QUERIES -->
+	
+	<!-- SELECT ALL MEMO -->
+	<select id="getMemoList" resultType="java.util.HashMap">
+		select 
+			MEMO_NUM, USER_ID, MEMO_NAME, MEMO_CONTEXT, MEMO_WRITE_DATE, MEMO_UPDATE_DATE, MEMO_UPDATE_USER, MEMO_FORMAT, MEMO_FAV
+		from
+			MEMO
+	</select>
+	
+	<!-- 팝업 창 유저 가져오기 -->
+	<select id="getAllUser" parameterType="String" resultType="java.util.HashMap">
+		select
+			USER_ID 
+		from
+			USER
+		where USER_ID != #{userId} and USER_ID != 'admin'
+	</select>
+	
+	<!-- SELECT MEMO WHERE USER ID = userId -->
+	<select id="getUserMemo" parameterType="String" resultType="java.util.HashMap">
+		select
+			MEMO_NUM, USER_ID, MEMO_NAME, MEMO_CONTEXT, MEMO_WRITE_DATE, MEMO_UPDATE_DATE, MEMO_UPDATE_USER, MEMO_FORMAT, MEMO_FAV
+		from 
+			MEMO
+		where USER_ID = #{userId}
+	</select>
+	<!-- MEMONUM으로 MEMO SELECT RETURN HASHMAP -->
+	<select id="getMemoByMemoNum" parameterType="Int" resultType="java.util.HashMap">
+		select
+			USER_ID, MEMO_NAME, MEMO_CONTEXT, MEMO_WRITE_DATE, MEMO_UPDATE_DATE, MEMO_UPDATE_USER, MEMO_FORMAT, MEMO_FAV
+		from
+			MEMO
+		where MEMO_NUM = #{memoNum}
+	</select>
+	
+	<!--MEMONUM으로 MEMO SELECT RETURN MEMO VO SELECT ONE 사용-->
+	<select id="getMemoVoByMemoNum" parameterType="int" resultType="com.itwinner.webmemo.memo.vo.MemoVo">
+		select
+			MEMO_NUM, USER_ID, MEMO_NAME, MEMO_CONTEXT, MEMO_WRITE_DATE, MEMO_UPDATE_DATE, MEMO_UPDATE_USER, MEMO_FORMAT, MEMO_FAV
+		from
+			MEMO
+		where MEMO_NUM = #{memoNum}
+	</select>
+
+	<!-- 메모 INSERT QUERIES -->
+	<insert id="insertMemo" parameterType="com.itwinner.webmemo.memo.vo.MemoVo">
+		insert into MEMO 
+			(MEMO_NUM, USER_ID, MEMO_NAME, MEMO_CONTEXT, MEMO_WRITE_DATE, MEMO_UPDATE_DATE, MEMO_UPDATE_USER, MEMO_FORMAT, MEMO_FAV)
+		values (
+			#{memoNum}
+			, #{userId}
+			, #{memoName}
+			, #{memoContext}
+			, #{memoWriteDate}
+			, #{memoUpdateDate}
+			, #{memoUpdateUser}
+			, #{memoFormat}
+			, #{memoFav}		
+		)
+	</insert>
+
+	<!-- 메모 작성 쿼리 -->
+	<insert id="writeMemo" parameterType="com.itwinner.webmemo.memo.vo.MemoVo">
+		insert into MEMO 
+			(MEMO_NUM, USER_ID, MEMO_NAME, MEMO_CONTEXT, MEMO_WRITE_DATE,  MEMO_FAV)
+		values (
+			#{memoNum}
+			, #{userId}
+			, #{memoName}
+			, #{memoContext}
+			, #{memoWriteDate}
+			, #{memoFav}		
+		)
+	</insert>
+
+	<delete id = "deleteMemo" parameterType="Int">
+		delete from MEMO where MEMO_NUM = #{memoNum}
+	</delete>
+	
+	<delete id = "deleteNotShared" parameterType="Integer">
+		delete from MEMO where MEMO_NUM = #{memoNum} and not exists
+			(select MEMO_SHARE.SHARED_MEMO_NUM from MEMO_SHARE WHERE MEMO_SHARE.SHARED_MEMO_NUM = #{memoNum})
+	</delete>
+	
+	<!-- 메모 수정 -->
+	<update id="updateMemoByMemoId" parameterType="com.itwinner.webmemo.memo.vo.MemoVo">
+		update MEMO set
+			MEMO_NAME = #{memoName},
+			MEMO_CONTEXT = #{memoContext},
+			MEMO_UPDATE_DATE = #{memoUpdateDate},
+			MEMO_UPDATE_USER = #{memoUpdateUser}
+		where MEMO_NUM = #{memoNum}
+	</update>
+	
+	<!-- 페이징에 필요한 쿼리들 -->
+	<!-- 유저의 memo 개수 query -->
+	<select id="countUserMemo" resultType="Integer">
+		select count(MEMO_NUM) from MEMO where USER_ID = #{userId}
+	</select>
+	
+	<!-- 게시물 목록 + 10개씩 출력 -->
+	<select id="selectMemoForPaging" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select
+			MEMO_NUM, USER_ID, MEMO_NAME, MEMO_CONTEXT, MEMO_WRITE_DATE, MEMO_UPDATE_DATE, MEMO_UPDATE_USER, MEMO_FORMAT, MEMO_FAV
+		from
+			MEMO
+		where USER_ID = #{user}
+		order by MEMO_NUM DESC
+		limit #{displayPost}, #{postNum}
+	</select>
+	
+	<!-- 검색 쿼리 -->
+	<!-- 파라미터는1 %키워드% 형태로 들어와야 함 -->
+	<select id ="searchMemoByContent" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select 
+			MEMO_NUM, USER_ID, MEMO_NAME, MEMO_CONTEXT, MEMO_WRITE_DATE, MEMO_UPDATE_DATE, MEMO_UPDATE_USER, MEMO_FORMAT, MEMO_FAV
+		from 
+			MEMO
+		<choose>
+			<when test='searchType.equals("title")'>
+				where MEMO_NAME like #{keyword}
+			</when>	
+			
+			<when test='searchType.equals("context")'>
+				where MEMO_CONTEXT like #{keyword}
+				
+			</when>
+		
+			<when test='searchType.equals("userId")'>
+				where USER_ID like #{keyword}
+				
+			</when>
+			
+			<otherwise>
+				where MEMO_UPDATE_USER like #{keyword}		
+			</otherwise>
+		</choose>
+		and USER_ID = #{user}
+		order by MEMO_FAV
+		limit #{postNum}, #{displayPost}	
+	</select>
+	
+	<!-- 게시물 총 갯수 + 검색 적용 -->
+	<select id="searchCount" parameterType="java.util.HashMap" resultType="Integer">
+		select count(MEMO_NUM) from MEMO
+		<if test='searchType.equals("title")'>
+			where MEMO_NAME like #{keyword}
+		</if>
+		
+		<if test='searchType.equals("context")'>
+			where MEMO_CONTEXT like #{keyword}
+		</if>
+		
+		<if test='searchType.equals("userId")'>
+			where USER_ID like #{keyword}
+		</if>	
+		and USER_ID = #{user}
+
+	</select>
+	
+	<!-- 메모 공유 쿼리 -->
+	<insert id="insertShareMemo" parameterType="java.util.HashMap">
+		insert into MEMO_SHARE
+		(SHARED_MEMO_NUM, SHARED_USER_ID, MEMO_SHARE_FAV, MEMO_SHARE_TIME)
+		select
+			#{memoNum}
+			, #{userId}
+			, false
+			, #{shareTime}
+		from DUAL where NOT exists
+		(select SHARED_USER_ID, SHARED_MEMO_NUM from MEMO_SHARE where SHARED_USER_ID = #{userId} and SHARED_MEMO_NUM = #{memoNum})
+		
+	</insert>
+	
+	<!-- 공유 된 메모 및 내 메모 조회 쿼리 -->
+	<select id="selectUnionMemo" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select
+			SHARED_MEMO_NUM, SHARED_USER_ID, MEMO_SHARE_FAV, MEMO_SHARE_TIME, MEMO_NUM, USER_ID, MEMO_NAME, MEMO_CONTEXT, MEMO_WRITE_DATE, MEMO_UPDATE_DATE, MEMO_UPDATE_USER, MEMO_FORMAT, MEMO_FAV
+		from 
+			(select * from MEMO_SHARE inner join MEMO on MEMO_SHARE.SHARED_MEMO_NUM = MEMO.MEMO_NUM where MEMO_SHARE.SHARED_USER_ID = #{userId} union
+		select null, null, null, null, MEMO_NUM, USER_ID, MEMO_NAME, MEMO_CONTEXT, MEMO_WRITE_DATE, MEMO_UPDATE_DATE, MEMO_UPDATE_USER, MEMO_FORMAT, MEMO_FAV from MEMO where USER_ID = #{userId})
+			MEMO_SET
+		<choose>
+			<when test='searchType.equals("title")'>
+				where MEMO_NAME like #{keyword}
+			</when>	
+			
+			<when test='searchType.equals("context")'>
+				where MEMO_CONTEXT like #{keyword}
+				
+			</when>
+		
+			<when test='searchType.equals("user")'>
+				where USER_ID like #{keyword}
+				
+			</when>
+			
+			<otherwise>
+				where MEMO_UPDATE_USER like #{keyword}		
+			</otherwise>
+		</choose>
+		order by field(MEMO_SHARE_FAV, 1) DESC, field(MEMO_FAV, 1) DESC, MEMO_WRITE_DATE DESC
+		limit #{postNum}, #{displayPost}
+	</select>
+	
+	<!-- 게시물 union 총 갯수 + 검색 적용 -->
+	<select id="searchUnionCount" parameterType="java.util.HashMap" resultType="Integer">
+		select count(MEMO_NUM) from 
+			(select * from MEMO_SHARE inner join MEMO on MEMO_SHARE.SHARED_MEMO_NUM = MEMO.MEMO_NUM where MEMO_SHARE.SHARED_USER_ID = #{userId} union
+			select null, null, null, null, MEMO_NUM, USER_ID, MEMO_NAME, MEMO_CONTEXT, MEMO_WRITE_DATE, MEMO_UPDATE_DATE, MEMO_UPDATE_USER, MEMO_FORMAT, MEMO_FAV from MEMO where USER_ID = #{userId})
+			MEMO_SET
+			
+		<if test='searchType.equals("title")'>
+			where MEMO_NAME like #{keyword}
+		</if>
+		
+		<if test='searchType.equals("context")'>
+			where MEMO_CONTEXT like #{keyword}
+		</if>
+		
+		<if test='searchType.equals("user")'>
+			where USER_ID like #{keyword}
+		</if>	
+	</select>
+	<!-- 공유된 유저 select -->
+	<select id="selectSharedUser" parameterType="Integer" resultType="java.util.HashMap">
+		select SHARED_USER_ID from
+		MEMO_SHARE where SHARED_MEMO_NUM = #{memoNum}
+	</select>
+	
+	<!-- 공유 취소 -->
+	<delete id ="deleteShare" parameterType="java.util.HashMap">
+		delete from MEMO_SHARE where SHARED_MEMO_NUM = #{memoNum} and SHARED_USER_ID = #{userId}
+	</delete>
+	
+	<!-- 공유 메모 즐겨 찾기-->
+	<update id="updateShareMemoFav" parameterType="java.util.HashMap">
+		update MEMO_SHARE set
+			MEMO_SHARE_FAV = #{favor}
+		where SHARED_MEMO_NUM = #{memoNum} and SHARED_USER_ID = #{userId}
+	</update>
+	
+
+	<!-- 내 메모 즐겨 찾기 -->
+	<update id="updateMemoFav" parameterType="java.util.HashMap">
+		update MEMO set
+			MEMO_FAV = #{favor}
+		where MEMO_NUM = #{memoNum}
+	</update>
+	
+	<!-- 메모 form 추가 쿼리 -->
+	<insert id ="insertMemoForm" parameterType="java.util.HashMap">
+		insert into MEMO_FORM 
+			(FORM_ID, OWN_USER_ID, FORM_NAME, FORM_DATA) 
+		values 
+			(null, #{userId}, #{formName}, #{formData})
+	</insert>
+	
+	<!-- user의 메모 form 가져 오기 -->
+	<select id = "selectUserMemoForm" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select 
+			FORM_ID, OWN_USER_ID, FORM_NAME, FORM_DATA
+		from 
+			MEMO_FORM
+		where OWN_USER_ID = #{userId}
+	</select>
+	
+	<!-- FORM ID로 메모 form 가져오기 -->
+	<select id ="selectMemoForm" parameterType="Integer" resultType="java.util.HashMap">
+		select
+			FORM_ID, OWN_USER_ID, FORM_NAME, FORM_DATA
+		from
+			MEMO_FORM
+		where 
+			FORM_ID = #{formId}
+	
+	</select>
+	
+	<delete id = "deleteForm" parameterType ="Integer">
+		delete from MEMO_FORM where FORM_ID = #{formId}
+	</delete>
+	
+	<!-- 즐겨찾기 된 메모 가져 오기 -->
+	<select id ="selectFavMemo" parameterType="String" resultType="java.util.HashMap">
+	select 
+		SHARED_MEMO_NUM, SHARED_USER_ID, MEMO_SHARE_FAV, date_format(MEMO_SHARE_TIME, '%y-%m-%d %p %h:%i') as MEMO_SHARE_TIME, MEMO_NUM, USER_ID, MEMO_NAME, MEMO_CONTEXT, date_format(MEMO_WRITE_DATE, '%y-%m-%d %p %h:%i') as MEMO_WRITE_DATE, date_format(MEMO_UPDATE_DATE, '%y-%m-%d %p %h:%i') as MEMO_UPDATE_DATE, MEMO_UPDATE_USER, MEMO_FORMAT, null as MEMO_FAV from (select * from MEMO_SHARE inner join MEMO on MEMO_SHARE.SHARED_MEMO_NUM = MEMO.MEMO_NUM where MEMO_SHARE.SHARED_USER_ID = #{userId} union 
+	select null, null, null, null, MEMO_NUM, USER_ID, MEMO_NAME, MEMO_CONTEXT, date_format(MEMO_WRITE_DATE, '%y-%m-%d %p %h:%i') as MEMO_WRITE_DATE, date_format(MEMO_UPDATE_DATE, '%y-%m-%d %p %h:%i') as MEMO_UPDATE_DATE, MEMO_UPDATE_USER, MEMO_FORMAT, MEMO_FAV from MEMO where user_id = #{userId}) 
+		MEMO_SET 
+	where 
+		MEMO_FAV = 1 or MEMO_SHARE_FAV = 1;
+	</select>
+	
+	<!-- find super -->
+	<select id ="selectSuperUser" resultType="String">
+	select 
+		USER_ID
+	from 
+		USER
+	where IS_SUPER = 1;
+	</select>
+	
+	<!-- 슈퍼 유저 전체 목록 카운트 -->
+	<select id = "superCount" resultType="Integer">
+		select
+			count(MEMO_NUM)
+		from 
+			MEMO;
+	</select>
+	
+	<!-- 슈퍼 유저 검색 카운트 -->
+		<select id="superSearchCount" parameterType="java.util.HashMap" resultType="Integer">
+		select count(MEMO_NUM) from MEMO
+		<if test='searchType.equals("title")'>
+			where MEMO_NAME like #{keyword}
+		</if>
+		
+		<if test='searchType.equals("context")'>
+			where MEMO_CONTEXT like #{keyword}
+		</if>
+		
+		<if test='searchType.equals("userId")'>
+			where USER_ID like #{keyword}
+		</if>	
+	</select>
+	
+	<!-- 슈퍼 유저 검색 쿼리 -->
+	<!-- 파라미터는1 %키워드% 형태로 들어와야 함 -->
+	<select id ="superSearchMemoByContent" parameterType="java.util.HashMap" resultType="java.util.HashMap">
+		select 
+			MEMO_NUM, USER_ID, MEMO_NAME, MEMO_CONTEXT, MEMO_WRITE_DATE, MEMO_UPDATE_DATE, MEMO_UPDATE_USER, MEMO_FORMAT, MEMO_FAV
+		from 
+			MEMO
+		<choose>
+			<when test='searchType.equals("title")'>
+				where MEMO_NAME like #{keyword}
+			</when>	
+			
+			<when test='searchType.equals("context")'>
+				where MEMO_CONTEXT like #{keyword}
+				
+			</when>
+		
+			<when test='searchType.equals("userId")'>
+				where USER_ID like #{keyword}
+				
+			</when>
+			
+			<otherwise>
+				where MEMO_UPDATE_USER like #{keyword}		
+			</otherwise>
+		</choose>
+		order by MEMO_FAV
+		limit #{displayPost}, #{postNum}
+	</select>
+	
+	<!-- 슈퍼 유저 공유 지워주기 -->
+	<delete id="superDeleteShare" parameterType="Integer">
+		delete from MEMO_SHARE where SHARED_MEMO_NUM =  #{memoNum}
+	</delete>
+</mapper>
+
